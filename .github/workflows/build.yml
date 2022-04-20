@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+    - master
+  push:
+    branches:
+    - master
+    - issue/*
+    - dev/harai
+
+env:
+  RELEASE_ACCESS_KEY_ID: AKIAQGFE5ESVAX4VNNEJ
+  ECR_SERVER: 013230744746.dkr.ecr.ap-northeast-1.amazonaws.com
+  IMAGE_NAME: gutenberg-ext-rdslog-imagerepository-vdhc7kuihwrl
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v2
+    - name: Generate build number
+      uses: einaregilsson/build-number@v3
+      with:
+        token: ${{secrets.GITHUB_TOKEN}}
+        prefix: build_number_generator
+    - name: Print new build number
+      run: echo "Build number is $BUILD_NUMBER"
+    - uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{env.RELEASE_ACCESS_KEY_ID}}
+        aws-secret-access-key: ${{secrets.AWS_RELEASE_SECRET_ACCESS_KEY}}
+        aws-region: ap-northeast-1
+    - run: aws ecr get-login-password --region ap-northeast-1 | docker login --username AWS --password-stdin $ECR_SERVER
+    - run: docker image build -t $IMAGE_NAME .
+    - run: docker image tag $IMAGE_NAME:latest $ECR_SERVER/$IMAGE_NAME:build-$BUILD_NUMBER
+    - run: docker image tag $IMAGE_NAME:latest $ECR_SERVER/$IMAGE_NAME:develop-$BUILD_NUMBER
+    - run: docker logout
+    - run: aws ecr get-login-password --region ap-northeast-1 | docker login --username AWS --password-stdin $ECR_SERVER
+    - run: docker image push $ECR_SERVER/$IMAGE_NAME:build-$BUILD_NUMBER
+      if: github.ref == 'refs/heads/master'
+    - run: docker image push $ECR_SERVER/$IMAGE_NAME:develop-$BUILD_NUMBER
+      if: github.ref != 'refs/heads/master'
