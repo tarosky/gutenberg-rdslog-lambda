@@ -8,12 +8,12 @@ on:
     branches:
     - master
     - issue/*
-    # - dev/harai
+    - dev/harai
 
 env:
-  RELEASE_ACCESS_KEY_ID: AKIAQGFE5ESVCEDH5QGK
-  ECR_SERVER: public.ecr.aws/u5f7o7g8
-  IMAGE_NAME: gutenberg-ext-rdslog-imagepublicrepository-ljm6dlceo6wt
+  RELEASE_ACCESS_KEY_ID: AKIAQGFE5ESVAX4VNNEJ
+  ECR_SERVER: 013230744746.dkr.ecr.ap-northeast-1.amazonaws.com
+  IMAGE_NAME: gutenberg-ext-rdslog-imagerepository-vdhc7kuihwrl
 
 jobs:
   build:
@@ -31,9 +31,14 @@ jobs:
       with:
         aws-access-key-id: ${{env.RELEASE_ACCESS_KEY_ID}}
         aws-secret-access-key: ${{secrets.AWS_RELEASE_SECRET_ACCESS_KEY}}
-        aws-region: us-east-1
-    - run: aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin $ECR_SERVER
+        aws-region: ap-northeast-1
+    - run: aws ecr get-login-password --region ap-northeast-1 | docker login --username AWS --password-stdin $ECR_SERVER
     - run: docker image build -t $IMAGE_NAME .
     - run: docker image tag $IMAGE_NAME:latest $ECR_SERVER/$IMAGE_NAME:build-$BUILD_NUMBER
+    - run: docker image tag $IMAGE_NAME:latest $ECR_SERVER/$IMAGE_NAME:develop-$BUILD_NUMBER
+    - run: docker logout
+    - run: aws ecr get-login-password --region ap-northeast-1 | docker login --username AWS --password-stdin $ECR_SERVER
     - run: docker image push $ECR_SERVER/$IMAGE_NAME:build-$BUILD_NUMBER
       if: github.ref == 'refs/heads/master'
+    - run: docker image push $ECR_SERVER/$IMAGE_NAME:develop-$BUILD_NUMBER
+      if: github.ref != 'refs/heads/master'
