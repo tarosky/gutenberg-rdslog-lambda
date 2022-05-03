@@ -8,10 +8,8 @@ import re
 import subprocess
 from datetime import datetime
 
-import boto3
-
 log = logging.getLogger(__name__)
-log.setLevel(logging.INFO)
+log.setLevel(logging.DEBUG)
 
 env = os.environ
 commentRe = re.compile(r'\s*([^:]+):\s+((?:\s*[^:\s]|:[^\s])+)(?=\s+\w+: |$)')
@@ -28,10 +26,6 @@ float_keys = {
     'Lock_time',
     'Query_time',
 }
-
-logs = boto3.client('logs')
-log_seq_token = None
-log_group = env['LOG_GROUP']
 
 
 class FingerprintError(Exception):
@@ -108,13 +102,8 @@ class LogEvent:
         separators=(',', ':'),
         sort_keys=True)
 
-  def epoch_ms(self):
-    return int(self.timestamp.timestamp() * 1000)
-
 
 def lambda_handler(event, context):
-  global log_seq_token
-
   try:
     data = decode(event['awslogs']['data'])
     log_events = []
@@ -124,27 +113,5 @@ def lambda_handler(event, context):
     log.info(event)
     raise ex
 
-  if len(log_events) == 0:
-    return
-
-  events = sorted(
-      [{
-          'timestamp': e.epoch_ms(),
-          'message': e.json(),
-      } for e in log_events],
-      key=lambda ev: ev['timestamp'])
-
-  token_option = {}
-  if log_seq_token is None:
-    logs.create_log_stream(
-        logGroupName=log_group, logStreamName=context.log_stream_name)
-  else:
-    token_option['sequenceToken'] = log_seq_token
-
-  response = logs.put_log_events(
-      logGroupName=log_group,
-      logStreamName=context.log_stream_name,
-      logEvents=events,
-      **token_option)
-
-  log_seq_token = response['nextSequenceToken']
+  for le in log_events:
+    print(le.json())
